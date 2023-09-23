@@ -62,27 +62,20 @@ def eval_env(term, env):
 def eval_subst(term):
     def subst(t1, v, t2):
         match t1:
-            case ("variable", x):
-                if x == v: return t2
-                else: return t1
-            case ("function", x, t):
-                if x == v: return t1
-                else: return ("function", x, subst(t, v, t2))
-            case ("application", lhs, rhs):
-                return ("application", subst(lhs, v, t2), subst(rhs, v, t2))
+            case ("variable", x) if x == v: return t2
+            case ("variable", x) if x != v: return t1
+            case ("function", x, t) if x == v: return t1
+            case ("function", x, t) if x != v: return ("function", x, subst(t, v, t2))
+            case ("application", lhs, rhs): return ("application", subst(lhs, v, t2), subst(rhs, v, t2))
 
     eval = eval_subst
     match term:
         case ("variable", x): raise Exception(f"unbound variable {x}")
         case ("function", x, t): return ("function", x, t)
         case ("application", t1, t2):
-            f = eval(t1)
-            match f:
-                case ("function", x, t):
-                    substed = subst(t, x, t2)
-                    return eval(substed)
-                case _:
-                    raise Exception("not a function")
+            match eval(t1):
+                case ("function", x, t): return eval(subst(t, x, t2))
+                case _: raise Exception("not a function")
 
 if __name__ == '__main__':
     parsed, rest = parse_term("(λx.λy.y) (λa.a) (λb.b)")
