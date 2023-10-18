@@ -62,31 +62,17 @@ def display(term):
         case ("number", n): return str(n)
         case ("addition", t1, t2): return f"+ ({display(t1)}) ({display(t2)})"
 
-def eval_env(term, env):
-    eval = eval_env
-    match term:
-        case ("variable", x): return env[x], env
-        case ("function", x, t): return ("function", x, t), env
-        case ("application", t1, t2):
-            arg, env = eval(t2, env)
-            f, env = eval(t1, env)
-            match f:
-                case ("function", x, t):
-                    return eval(t, {**env, x: arg})
-                case _:
-                    raise Exception("not a function")
+def subst(t1, v, t2):
+    match t1:
+        case ("variable", x) if x == v: return t2
+        case ("variable", x) if x != v: return t1
+        case ("function", x, t) if x == v: return t1
+        case ("function", x, t) if x != v: return ("function", x, subst(t, v, t2))
+        case ("application", lhs, rhs): return ("application", subst(lhs, v, t2), subst(rhs, v, t2))
+        case ("number", n): return t1
+        case ("addition", lhs, rhs): return ("addition", subst(lhs, v, t2), subst(rhs, v, t2))
 
 def eval_subst(term):
-    def subst(t1, v, t2):
-        match t1:
-            case ("variable", x) if x == v: return t2
-            case ("variable", x) if x != v: return t1
-            case ("function", x, t) if x == v: return t1
-            case ("function", x, t) if x != v: return ("function", x, subst(t, v, t2))
-            case ("application", lhs, rhs): return ("application", subst(lhs, v, t2), subst(rhs, v, t2))
-            case ("number", n): return t1
-            case ("addition", lhs, rhs): return ("addition", subst(lhs, v, t2), subst(rhs, v, t2))
-
     eval = eval_subst
     match term:
         case ("variable", x): raise Exception(f"unbound variable {x}")
@@ -100,6 +86,29 @@ def eval_subst(term):
             match (eval(t1), eval(t2)):
                 case (("number", n1), ("number", n2)): return ("number", n1 + n2)
                 case _: raise Exception("not a number")
+
+def simplify(term):
+    match term:
+        case ("variable", x): return term
+        case ("function", x, t): return ("function", x, simplify(t))
+        case ("application", t1, t2):
+            match (simplify(t1), simplify(t2)):
+                case (("function", x, t), t2): return simplify(subst(t, x, t2))
+                case (t1, t2): return ("application", t1, t2)
+        case ("number", n): return term
+        case ("addition", t1, t2):
+            match (simplify(t1), simplify(t2)):
+                case (("number", n1), ("number", n2)): return ("number", n1 + n2)
+                case (t1, t2): return ("addition", t1, t2)
+        case _: print(f"{term=}"); raise Exception("unhandled case")
+
+def eval_subst_str(str, do_simplify=True):
+    parsed, _ = parse_term(str)
+    res = eval_subst(parsed)
+
+    if do_simplify: return display(simplify(res))
+    else: return display(res)
+
 
 if __name__ == '__main__':
     # parsed, rest = parse_term("(λx.λy.y) (λa.a) (λb.b)")
@@ -126,21 +135,27 @@ if __name__ == '__main__':
     zero = "λf.λx.x"
     succ = "λn.λf.λx.f (n f x)"
     one = f"({succ}) ({zero})"
-    plus = "λm.λn.λf.λx.m (f (n (f x))"
+    plus = "λm.λn.((m (λn.(λf.(λy.f ((n f) y))))) n)"
     two = f"({plus}) ({one}) ({one})"
 
     parsed, _ = parse_term(one)
     print(f"{display(parsed)=}, {parsed=}")
-    res1, _ = eval_env(parsed, {})
+    # res1, _ = eval_env(parsed, {})
     res2 = eval_subst(parsed)
-    print(display(res1))
+    # print(display(res1))
     print(display(res2))
-    
-    parsed, rest = parse_term("+ 1 1")
-    res = eval_subst(parsed)
-    print(f"{display(parsed)=}, {parsed=}, {rest=}")
-    print(display(res))
 
-    parsed, _ = parse_term(f"{one} (λx.+ x 1) 0")
-    res = eval_subst(parsed)
-    print(display(res))
+    # print(f"{plus=}")
+    # print(f"{one=}")
+    # print(f"{two=}")
+    print(eval_subst_str(two))
+    print(eval_subst_str(two, do_simplify=False))
+    
+    # parsed, rest = parse_term("+ 1 1")
+    # res = eval_subst(parsed)
+    # print(f"{display(parsed)=}, {parsed=}, {rest=}")
+    # print(display(res))
+
+    # parsed, _ = parse_term(f"{one} (λx.+ x 1) 0")
+    # res = eval_subst(parsed)
+    # print(display(res))
