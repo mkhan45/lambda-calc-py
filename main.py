@@ -100,7 +100,6 @@ def simplify(term):
             match (simplify(t1), simplify(t2)):
                 case (("number", n1), ("number", n2)): return ("number", n1 + n2)
                 case (t1, t2): return ("addition", t1, t2)
-        case _: print(f"{term=}"); raise Exception("unhandled case")
 
 def eval_subst_str(str, do_simplify=True):
     parsed, _ = parse_term(str)
@@ -133,9 +132,11 @@ if __name__ == '__main__':
     # print(display(res2))
 
     zero = "λf.λx.x"
+    # zero = "λf.λx.x"
     succ = "λn.λf.λx.f (n f x)"
     one = f"({succ}) ({zero})"
     plus = "λm.λn.((m (λn.(λf.(λy.f ((n f) y))))) n)"
+    mul = "λm.λn.λf.m (n f)"
     two = f"({plus}) ({one}) ({one})"
 
     parsed, _ = parse_term(one)
@@ -150,6 +151,14 @@ if __name__ == '__main__':
     # print(f"{two=}")
     print(eval_subst_str(two))
     print(eval_subst_str(two, do_simplify=False))
+
+    real_succ = "λn.(+ n 1)"
+    print(eval_subst_str(f"({real_succ}) 0"))
+
+    church_to_int = f"λn.n ({real_succ}) 0"
+    four = f"({plus}) ({two}) ({two})"
+    sixteen = f"({mul}) ({four}) ({four})"
+    print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
     
     # parsed, rest = parse_term("+ 1 1")
     # res = eval_subst(parsed)
