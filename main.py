@@ -11,6 +11,9 @@
 # number: ("number", int)
 # addition: ("addition", lambda_term, lambda_term)
 
+# dumb pratt parser
+# Can't use spaces except for function application
+# Make sure to parenthesize everything
 def parse_term(s, bp=0):
     if s == "": raise Exception("unexpected end of input")
 
@@ -62,6 +65,9 @@ def display(term):
         case ("number", n): return str(n)
         case ("addition", t1, t2): return f"+ ({display(t1)}) ({display(t2)})"
 
+
+#        (f x, "x", 15) # ("application", f, ("variable", x))
+#         f 15
 def subst(t1, v, t2):
     match t1:
         case ("variable", x) if x == v: return t2
@@ -72,6 +78,10 @@ def subst(t1, v, t2):
         case ("number", n): return t1
         case ("addition", lhs, rhs): return ("addition", subst(lhs, v, t2), subst(rhs, v, t2))
 
+
+# (λx.x+5) (5 + 10)
+# ("application", ("function", "x", ("plus", "x", 5)) ("plus", 5, 10))
+# → ("plus", ("plus", 5, 10), 5)
 def eval_subst(term):
     eval = eval_subst
     match term:
@@ -117,6 +127,28 @@ if __name__ == '__main__':
     # print(display(res1))
     # print(display(res2))
 
+    # (2 + 3) → 5
+
+    # ((λx.λy.x+y) 5) 10
+    # (λy.5+y) 10
+    # 5+10
+
+    # true = "λx.λy.x"
+    # false = "λx.λy.y"
+    # _and = "λp.λq.p q p"
+
+    # print(eval_subst_str(f"(λp.λq.p q p) (λx.λy.x) (λx.λy.x)"))
+
+    # parsed, _ = parse_term("(λx.x) (λy.y)")
+    # (lambda x: x)(lambda y: y)
+    # (x => x)(y => y)
+    # res = eval_subst(parsed)
+    # print(parsed)
+    # print(display(res))
+
+    # parsed, _ = parse_term("(λx.x) (+ 5 10)")
+    # print(parsed)
+
     # true = "λx.λy.x"
     # false = "λx.λy.y"
     # and_ = "λp.λq.p q p"
@@ -131,40 +163,53 @@ if __name__ == '__main__':
     # print(display(res1))
     # print(display(res2))
 
+    print(eval_subst_str("(λx.+ x 5) 3"))
+
     zero = "λf.λx.x"
-    # zero = "λf.λx.x"
+    # # zero = "λf.λx.x"
     succ = "λn.λf.λx.f (n f x)"
     one = f"({succ}) ({zero})"
-    plus = "λm.λn.((m (λn.(λf.(λy.f ((n f) y))))) n)"
-    mul = "λm.λn.λf.m (n f)"
+    # print(one)
+    plus = "(λm.λn.((m (λn.(λf.(λy.f ((n f) y))))) n))"
+    mul = "(λm.λn.λf.m (n f))"
     two = f"({plus}) ({one}) ({one})"
+    print(eval_subst_str(f"({mul}) ({two}) ({two})"))
 
-    parsed, _ = parse_term(one)
-    print(f"{display(parsed)=}, {parsed=}")
-    # res1, _ = eval_env(parsed, {})
-    res2 = eval_subst(parsed)
-    # print(display(res1))
-    print(display(res2))
+    # parsed, _ = parse_term(one)
+    # print(f"{display(parsed)=}, {parsed=}")
+    # # res1, _ = eval_env(parsed, {})
+    # res2 = eval_subst(parsed)
+    # # print(display(res1))
+    # print(display(res2))
 
-    # print(f"{plus=}")
-    # print(f"{one=}")
-    # print(f"{two=}")
-    print(eval_subst_str(two))
-    print(eval_subst_str(two, do_simplify=False))
+    # # print(f"{plus=}")
+    # # print(f"{one=}")
+    # # print(f"{two=}")
+    # print(eval_subst_str(two))
+    # print(eval_subst_str(two, do_simplify=False))
 
-    real_succ = "λn.(+ n 1)"
-    print(eval_subst_str(f"({real_succ}) 0"))
+    # real_succ = "λn.(+ n 1)"
+    # print(eval_subst_str(f"({real_succ}) 0"))
+    # church_to_int = f"λn.n ({real_succ}) 0"
+    # print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
 
-    church_to_int = f"λn.n ({real_succ}) 0"
-    four = f"({plus}) ({two}) ({two})"
-    sixteen = f"({mul}) ({four}) ({four})"
-    print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
+    # church_to_int = f"λn.n ({real_succ}) 0"
+    # four = f"({plus}) ({two}) ({two})"
+    # sixteen = f"({mul}) ({four}) ({four})"
+    # print(sixteen)
+    # print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
     
-    # parsed, rest = parse_term("+ 1 1")
-    # res = eval_subst(parsed)
-    # print(f"{display(parsed)=}, {parsed=}, {rest=}")
-    # print(display(res))
+    # # parsed, rest = parse_term("+ 1 1")
+    # # res = eval_subst(parsed)
+    # # print(f"{display(parsed)=}, {parsed=}, {rest=}")
+    # # print(display(res))
 
-    # parsed, _ = parse_term(f"{one} (λx.+ x 1) 0")
-    # res = eval_subst(parsed)
-    # print(display(res))
+    # # parsed, _ = parse_term(f"{one} (λx.+ x 1) 0")
+    # # res = eval_subst(parsed)
+    # # print(display(res))
+
+    # print(eval_subst_str("(λx.x x) (λy.y y)"))
+    # (λx.x x) (λy.y y)
+    # (λy.y y) (λy.y y)
+    #     |
+    #   (λy.y y)
