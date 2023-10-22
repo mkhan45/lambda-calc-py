@@ -1,13 +1,16 @@
 # lambda_term: x # variable
 #            | \x → lambda_term # function
 #            | lambda_term lambda_term # application
-#            # additions, not actually part of the lambda calculus
+
+#            # extensions, not actually part of the lambda calculus
 #            | n # number literal
 #            | + lambda_term lambda_term # addition
 
 # variable: ("variable", str)
 # function: ("function", variable, lambda_term)
 # application: ("application", lambda_term, lambda_term)
+
+# extensions, not part of the base lambda calculus
 # number: ("number", int)
 # addition: ("addition", lambda_term, lambda_term)
 
@@ -17,17 +20,15 @@
 def parse_term(s, bp=0):
     if s == "": raise Exception("unexpected end of input")
 
-    def parse_function(s):
-        assert s[0] in ("\\", "λ")
-        v = s[1]
-        assert s[2] in (".", "→")
-        (e, rest) = parse_term(s[3:])
-        return ("function", v, e), rest
-
     t, rest = None, None
+    # recursion for right associativity
+    # we accumulate the term into t, and leave the remainder of the string in rest
     match s[0]:
         case "\\" | "λ": 
-            t, rest = parse_function(s)
+            v = s[1]
+            assert s[2] in (".", "→")
+            (e, rest) = parse_term(s[3:])
+            t = ("function", v, e)
         case "(":
             (t, rest) = parse_term(s[1:])
             assert rest[0] == ")"
@@ -47,6 +48,7 @@ def parse_term(s, bp=0):
         case _:
             t, rest = ("variable", s[0]), s[1:]
     
+    # iteration for left associativity
     while rest != "":
         if rest[0] == " " and bp == 0:
             rest = rest[1:]
@@ -65,19 +67,17 @@ def display(term):
         case ("number", n): return str(n)
         case ("addition", t1, t2): return f"+ ({display(t1)}) ({display(t2)})"
 
-
 #        (f x, "x", 15) # ("application", f, ("variable", x))
 #         f 15
 def subst(t1, v, t2):
     match t1:
-        case ("variable", x) if x == v: return t2
-        case ("variable", x) if x != v: return t1
-        case ("function", x, t) if x == v: return t1
-        case ("function", x, t) if x != v: return ("function", x, subst(t, v, t2))
-        case ("application", lhs, rhs): return ("application", subst(lhs, v, t2), subst(rhs, v, t2))
-        case ("number", n): return t1
-        case ("addition", lhs, rhs): return ("addition", subst(lhs, v, t2), subst(rhs, v, t2))
-
+        case ("variable", x) if x == v: return t2 # subst
+        case ("variable", x) if x != v: return t1 # leaf
+        case ("number", n): return t1 # leaf
+        case ("function", x, t) if x == v: return t1 # shadowing
+        case ("function", x, t) if x != v: return ("function", x, subst(t, v, t2)) # recurse
+        case ("application", lhs, rhs): return ("application", subst(lhs, v, t2), subst(rhs, v, t2)) # recurse
+        case ("addition", lhs, rhs): return ("addition", subst(lhs, v, t2), subst(rhs, v, t2)) # recurse
 
 # (λx.x+5) (5 + 10)
 # ("application", ("function", "x", ("plus", "x", 5)) ("plus", 5, 10))
@@ -85,27 +85,29 @@ def subst(t1, v, t2):
 def eval_subst(term):
     eval = eval_subst
     match term:
-        case ("variable", x): raise Exception(f"unbound variable {x}")
-        case ("function", x, t): return ("function", x, t)
-        case ("application", t1, t2):
-            match eval(t1):
-                case ("function", x, t): return eval(subst(t, x, t2))
+        case ("variable", x): raise Exception(f"unbound variable {x}") # free variable, wasn't substed
+        case ("function", x, t): return ("function", x, t) # irreducible
+        case ("application", t1, t2): # all three rules at once here
+            match eval(t1): # first eval lhs
+                case ("function", x, t): return eval(subst(t, x, eval(t2))) # eval rhs, then beta reduction
                 case _: raise Exception("not a function")
+        # extensions, not part of the base lambda calculus
         case ("number", n): return term
         case ("addition", t1, t2):
             match (eval(t1), eval(t2)):
                 case (("number", n1), ("number", n2)): return ("number", n1 + n2)
                 case _: raise Exception("not a number")
 
+# beta reduces all inner terms
 def simplify(term):
     match term:
-        case ("variable", x): return term
+        case ("variable" | "number", _): return term
         case ("function", x, t): return ("function", x, simplify(t))
         case ("application", t1, t2):
             match (simplify(t1), simplify(t2)):
                 case (("function", x, t), t2): return simplify(subst(t, x, t2))
                 case (t1, t2): return ("application", t1, t2)
-        case ("number", n): return term
+        # extensions, not part of the base lambda calculus
         case ("addition", t1, t2):
             match (simplify(t1), simplify(t2)):
                 case (("number", n1), ("number", n2)): return ("number", n1 + n2)
@@ -117,7 +119,6 @@ def eval_subst_str(str, do_simplify=True):
 
     if do_simplify: return display(simplify(res))
     else: return display(res)
-
 
 if __name__ == '__main__':
     # parsed, rest = parse_term("(λx.λy.y) (λa.a) (λb.b)")
@@ -188,16 +189,16 @@ if __name__ == '__main__':
     # print(eval_subst_str(two))
     # print(eval_subst_str(two, do_simplify=False))
 
-    # real_succ = "λn.(+ n 1)"
+    real_succ = "λn.(+ n 1)"
     # print(eval_subst_str(f"({real_succ}) 0"))
     # church_to_int = f"λn.n ({real_succ}) 0"
     # print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
 
-    # church_to_int = f"λn.n ({real_succ}) 0"
-    # four = f"({plus}) ({two}) ({two})"
-    # sixteen = f"({mul}) ({four}) ({four})"
-    # print(sixteen)
-    # print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
+    church_to_int = f"λn.n ({real_succ}) 0"
+    four = f"({plus}) ({two}) ({two})"
+    sixteen = f"({mul}) ({four}) ({four})"
+    # print(f"{sixteen=}")
+    print(eval_subst_str(f"({church_to_int}) ({sixteen})"))
     
     # # parsed, rest = parse_term("+ 1 1")
     # # res = eval_subst(parsed)
